@@ -119,53 +119,29 @@ func (ctx *BuiltinEvalContext) Input() UIInput {
 	return ctx.InputValue
 }
 
-func (ctx *BuiltinEvalContext) InitProvider(addr addrs.AbsProviderConfig) (providers.Interface, error) {
-	// If we already initialized, it is an error
-	if p := ctx.Provider(addr); p != nil {
-		return nil, fmt.Errorf("%s is already initialized", addr)
-	}
-
-	// Warning: make sure to acquire these locks AFTER the call to Provider
-	// above, since it also acquires locks.
+func (ctx *BuiltinEvalContext) Provider(addr addrs.AbsProviderConfig) (providers.Interface, error) {
 	ctx.ProviderLock.Lock()
 	defer ctx.ProviderLock.Unlock()
 
 	key := addr.String()
 
-	p, err := ctx.Plugins.NewProviderInstance(addr.Provider)
+	provider, ok := ctx.ProviderCache[key]
+	if ok {
+		return provider, nil
+	}
+
+	provider, err := ctx.Plugins.NewProviderInstance(addr.Provider)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("[TRACE] BuiltinEvalContext: Initialized %q provider for %s", addr.String(), addr)
-	ctx.ProviderCache[key] = p
+	log.Printf("[TRACE] BuiltinEvalContext: Initialized provider %s", addr)
+	ctx.ProviderCache[key] = provider
 
-	return p, nil
-}
-
-func (ctx *BuiltinEvalContext) Provider(addr addrs.AbsProviderConfig) providers.Interface {
-	ctx.ProviderLock.Lock()
-	defer ctx.ProviderLock.Unlock()
-
-	return ctx.ProviderCache[addr.String()]
+	return provider, nil
 }
 
 func (ctx *BuiltinEvalContext) ProviderSchema(addr addrs.AbsProviderConfig) (providers.ProviderSchema, error) {
-	// first see if we have already have an initialized provider to avoid
-	// re-loading it only for the schema
-	p := ctx.Provider(addr)
-	if p != nil {
-		resp := p.GetProviderSchema()
-		// convert any diagnostics here in case this is the first call
-		// FIXME: better control provider instantiation so we can be sure this
-		// won't be the first call to ProviderSchema
-		var err error
-		if resp.Diagnostics.HasErrors() {
-			err = resp.Diagnostics.ErrWithWarnings()
-		}
-		return resp, err
-	}
-
 	return ctx.Plugins.ProviderSchema(addr.Provider)
 }
 
@@ -191,10 +167,9 @@ func (ctx *BuiltinEvalContext) ConfigureProvider(addr addrs.AbsProviderConfig, c
 		panic(fmt.Sprintf("%s configured by wrong module %s", addr, ctx.Path()))
 	}
 
-	p := ctx.Provider(addr)
-	if p == nil {
-		diags = diags.Append(fmt.Errorf("%s not initialized", addr))
-		return diags
+	p, err := ctx.Provider(addr)
+	if err != nil {
+		return diags.Append(err)
 	}
 
 	req := providers.ConfigureProviderRequest{

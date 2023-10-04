@@ -48,10 +48,11 @@ func getProvider(ctx EvalContext, addr addrs.AbsProviderConfig) (providers.Inter
 		// Should never happen
 		panic("GetProvider used with uninitialized provider configuration address")
 	}
-	provider := ctx.Provider(addr)
-	if provider == nil {
-		return nil, providers.ProviderSchema{}, fmt.Errorf("provider %s not initialized", addr)
+	provider, err := ctx.Provider(addr)
+	if err != nil {
+		return nil, providers.ProviderSchema{}, err
 	}
+
 	// Not all callers require a schema, so we will leave checking for a nil
 	// schema to the callers.
 	schema, err := ctx.ProviderSchema(addr)

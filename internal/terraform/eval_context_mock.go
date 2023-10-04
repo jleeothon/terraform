@@ -34,12 +34,6 @@ type MockEvalContext struct {
 	InputCalled bool
 	InputInput  UIInput
 
-	InitProviderCalled   bool
-	InitProviderType     string
-	InitProviderAddr     addrs.AbsProviderConfig
-	InitProviderProvider providers.Interface
-	InitProviderError    error
-
 	ProviderCalled   bool
 	ProviderAddr     addrs.AbsProviderConfig
 	ProviderProvider providers.Interface
@@ -177,17 +171,10 @@ func (c *MockEvalContext) Input() UIInput {
 	return c.InputInput
 }
 
-func (c *MockEvalContext) InitProvider(addr addrs.AbsProviderConfig) (providers.Interface, error) {
-	c.InitProviderCalled = true
-	c.InitProviderType = addr.String()
-	c.InitProviderAddr = addr
-	return c.InitProviderProvider, c.InitProviderError
-}
-
-func (c *MockEvalContext) Provider(addr addrs.AbsProviderConfig) providers.Interface {
+func (c *MockEvalContext) Provider(addr addrs.AbsProviderConfig) (providers.Interface, error) {
 	c.ProviderCalled = true
 	c.ProviderAddr = addr
-	return c.ProviderProvider
+	return c.ProviderProvider, nil
 }
 
 func (c *MockEvalContext) ProviderSchema(addr addrs.AbsProviderConfig) (providers.ProviderSchema, error) {

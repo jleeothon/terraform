@@ -35,22 +35,14 @@ type EvalContext interface {
 	// Input is the UIInput object for interacting with the UI.
 	Input() UIInput
 
-	// InitProvider initializes the provider with the given address, and returns
-	// the implementation of the resource provider or an error.
-	//
-	// It is an error to initialize the same provider more than once. This
-	// method will panic if the module instance address of the given provider
-	// configuration does not match the Path() of the EvalContext.
-	InitProvider(addr addrs.AbsProviderConfig) (providers.Interface, error)
-
-	// Provider gets the provider instance with the given address (already
-	// initialized) or returns nil if the provider isn't initialized.
+	// Provider gets the provider instance with the given address, and
+	// initializes a new instance if there wasn't one already.
 	//
 	// This method expects an _absolute_ provider configuration address, since
 	// resources in one module are able to use providers from other modules.
 	// InitProvider must've been called on the EvalContext of the module
 	// that owns the given provider before calling this method.
-	Provider(addrs.AbsProviderConfig) providers.Interface
+	Provider(addrs.AbsProviderConfig) (providers.Interface, error)
 
 	// ProviderSchema retrieves the schema for a particular provider, which
 	// must have already been initialized with InitProvider.
