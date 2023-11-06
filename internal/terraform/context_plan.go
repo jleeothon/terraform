@@ -83,8 +83,13 @@ type PlanOpts struct {
 	// will be added to the plan graph.
 	ImportTargets []*ImportTarget
 
-	// GenerateConfig tells Terraform where to write any generated configuration
-	// for any ImportTargets that do not have configuration already.
+	// forgetTargets is a list of target resources that Terraform
+	// will plan to remove from state.
+	forgetTargets []addrs.ConfigResource
+
+	// GenerateConfigPath tells Terraform where to write any generated
+	// configuration for any ImportTargets that do not have configuration
+	// already.
 	//
 	// If empty, then no config will be generated.
 	GenerateConfigPath string
@@ -553,6 +558,17 @@ func (c *Context) planWalk(config *configs.Config, prevRunState *states.State, o
 		return nil, diags
 	}
 
+	// TODO KEM: Validation could be earlier
+	// first, make sure nothing targeted by a removed block is still in config
+	removeStmts := refactoring.FindRemoveStatements(config)
+	for _, rst := range removeStmts {
+		if rst.Destroy {
+			// no-op
+		} else {
+			opts.forgetTargets = append(opts.forgetTargets, *rst.From)
+		}
+	}
+
 	graph, walkOp, moreDiags := c.planGraph(config, prevRunState, opts)
 	diags = diags.Append(moreDiags)
 	if diags.HasErrors() {
@@ -643,6 +659,7 @@ func (c *Context) planGraph(config *configs.Config, prevRunState *states.State, 
 			Operation:          walkPlan,
 			ExternalReferences: opts.ExternalReferences,
 			ImportTargets:      opts.ImportTargets,
+			forgetTargets:      opts.forgetTargets,
 			GenerateConfigPath: opts.GenerateConfigPath,
 		}).Build(addrs.RootModuleInstance)
 		return graph, walkPlan, diags
